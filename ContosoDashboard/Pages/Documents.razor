@@ -1,0 +1,271 @@
+@page "/documents"
+@using ContosoDashboard.Models
+@using ContosoDashboard.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Security.Claims
+@attribute [Authorize]
+@inject DocumentService DocumentService
+@inject IProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Documents - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Documents</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-5 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="card-title">Upload document</h3>
+
+                    <EditForm Model="uploadModel" OnValidSubmit="HandleUploadAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label">Title</label>
+                            <InputText class="form-control" @bind-Value="uploadModel.Title" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <InputText class="form-control" @bind-Value="uploadModel.Category" placeholder="Project Documents" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea class="form-control" @bind-Value="uploadModel.Description" rows="3" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tags</label>
+                            <InputText class="form-control" @bind-Value="uploadModel.Tags" placeholder="finance, design, requirements" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Project</label>
+                            <InputSelect class="form-select" @bind-Value="uploadModel.ProjectId">
+                                <option value="0">No project</option>
+                                @foreach (var project in availableProjects)
+                                {
+                                    <option value="@project.ProjectId">@project.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">File</label>
+                            <InputFile OnChange="HandleFileSelected" class="form-control" />
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(selectedFileName))
+                        {
+                            <p class="text-muted small">Selected: @selectedFileName</p>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(statusMessage))
+                        {
+                            <div class="alert @(isError ? "alert-danger" : "alert-success")">@statusMessage</div>
+                        }
+
+                        <button type="submit" class="btn btn-primary" disabled="@(selectedFile is null)">
+                            Upload document
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">My documents</h3>
+
+                    @if (documents is null)
+                    {
+                        <p><em>Loading...</em></p>
+                    }
+                    else if (!documents.Any())
+                    {
+                        <div class="alert alert-info">No documents uploaded yet.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Category</th>
+                                        <th>Project</th>
+                                        <th>Status</th>
+                                        <th>Size</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var document in documents)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@document.Title</strong><br />
+                                                <small class="text-muted">@document.FileName</small>
+                                            </td>
+                                            <td>@document.Category</td>
+                                            <td>@(document.Project?.Name ?? "-")</td>
+                                            <td>
+                                                <span class="badge bg-@GetScanBadge(document.ScanStatus)">@document.ScanStatus</span>
+                                            </td>
+                                            <td>@FormatBytes(document.FileSizeBytes)</td>
+                                            <td>@document.UploadedAt.ToString("MMM dd, yyyy")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly UploadDocumentModel uploadModel = new();
+    private List<Project> availableProjects = new();
+    private List<Document> documents = new();
+    private IBrowserFile? selectedFile;
+    private string selectedFileName = string.Empty;
+    private string statusMessage = string.Empty;
+    private bool isError;
+    private int currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+        {
+            currentUserId = userId;
+        }
+
+        if (currentUserId > 0)
+        {
+            availableProjects = await ProjectService.GetUserProjectsAsync(currentUserId);
+            documents = await DocumentService.GetUserDocumentsAsync(currentUserId);
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs args)
+    {
+        selectedFile = args.File;
+        selectedFileName = selectedFile.Name;
+        statusMessage = string.Empty;
+    }
+
+    private async Task HandleUploadAsync()
+    {
+        if (selectedFile == null)
+        {
+            statusMessage = "Please select a file to upload.";
+            isError = true;
+            return;
+        }
+
+        if (currentUserId <= 0)
+        {
+            statusMessage = "You are not signed in correctly.";
+            isError = true;
+            return;
+        }
+
+        var projectId = uploadModel.ProjectId > 0 ? uploadModel.ProjectId : 0;
+        if (projectId == 0)
+        {
+            statusMessage = "Please select a project for the document.";
+            isError = true;
+            return;
+        }
+
+        try
+        {
+            await using var stream = selectedFile.OpenReadStream(25 * 1024 * 1024);
+            var created = await DocumentService.UploadDocumentAsync(
+                currentUserId,
+                projectId,
+                uploadModel.Title,
+                string.IsNullOrWhiteSpace(uploadModel.Category) ? "General" : uploadModel.Category,
+                uploadModel.Description,
+                uploadModel.Tags,
+                stream,
+                selectedFile.Name,
+                selectedFile.ContentType);
+
+            if (created == null)
+            {
+                statusMessage = "Upload was rejected. Check the file type, size, and project access.";
+                isError = true;
+                return;
+            }
+
+            statusMessage = "Document uploaded successfully and queued for scan.";
+            isError = false;
+            uploadModel.Reset();
+            selectedFile = null;
+            selectedFileName = string.Empty;
+            documents = await DocumentService.GetUserDocumentsAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            statusMessage = ex.Message;
+            isError = true;
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+        if (bytes < 1024 * 1024)
+            return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    private static string GetScanBadge(ContosoDashboard.Models.DocumentScanStatus status)
+    {
+        return status switch
+        {
+            ContosoDashboard.Models.DocumentScanStatus.Pending => "secondary",
+            ContosoDashboard.Models.DocumentScanStatus.Scanning => "primary",
+            ContosoDashboard.Models.DocumentScanStatus.Clean => "success",
+            ContosoDashboard.Models.DocumentScanStatus.Infected => "danger",
+            ContosoDashboard.Models.DocumentScanStatus.Failed => "warning",
+            _ => "secondary"
+        };
+    }
+
+    private class UploadDocumentModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? Tags { get; set; }
+        public int ProjectId { get; set; }
+
+        public void Reset()
+        {
+            Title = string.Empty;
+            Category = string.Empty;
+            Description = null;
+            Tags = null;
+            ProjectId = 0;
+        }
+    }
+}

@@ -15,9 +15,9 @@
 
 **Purpose**: Shared infrastructure and storage scaffolding for document upload processing
 
-- [ ] T001 Create the document storage and scan-status folder structure under ContosoDashboard/Services and ContosoDashboard/Pages with the planned local upload directory contract
-- [ ] T002 [P] Add storage abstraction contract in ContosoDashboard/Services/IFileStorageService.cs for UploadAsync, DeleteAsync, DownloadAsync, and GetUrlAsync
-- [ ] T003 [P] Add upload and scan configuration placeholders in ContosoDashboard/appsettings.json and ContosoDashboard/appsettings.Development.json for storage path, queue, and local/offline settings
+- [X] T001 Create the document storage and scan-status folder structure under ContosoDashboard/Services and ContosoDashboard/Pages with the planned local upload directory contract
+- [X] T002 [P] Add storage abstraction contract in ContosoDashboard/Services/IFileStorageService.cs for UploadAsync, DeleteAsync, DownloadAsync, and GetUrlAsync
+- [X] T003 [P] Add upload and scan configuration placeholders in ContosoDashboard/appsettings.json and ContosoDashboard/appsettings.Development.json for storage path, queue, and local/offline settings
 
 ---
 
@@ -27,12 +27,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Create document-domain models in ContosoDashboard/Models/Document.cs, DocumentShare.cs, and AuditEvent.cs with integer keys, metadata fields, and scan-state values
-- [ ] T005 [P] Extend the EF Core model setup in ContosoDashboard/Data/ApplicationDbContext.cs to include Document, DocumentShare, and AuditEvent and add indexes for user, project, and scan-state lookups
-- [ ] T006 [P] Implement the local filesystem storage provider in ContosoDashboard/Services/LocalFileStorageService.cs using GUID-based paths under AppData/uploads and secure path generation
-- [ ] T007 Create the primary upload/service layer in ContosoDashboard/Services/DocumentService.cs with validation, file-type checks, file-size enforcement, and permission-aware query methods
-- [ ] T008 Add queue-based background scan contract and payload model in ContosoDashboard/Services/DocumentScanQueueMessage.cs and ContosoDashboard/Services/DocumentScanStatus.cs for Azure Queue Storage processing
-- [ ] T009 Register the storage, queue, and document services in ContosoDashboard/Program.cs and wire the existing authorization policies to the new document workflow
+- [X] T004 Create document-domain models in ContosoDashboard/Models/Document.cs, DocumentShare.cs, and AuditEvent.cs with integer keys, metadata fields, and scan-state values
+- [X] T005 [P] Extend the EF Core model setup in ContosoDashboard/Data/ApplicationDbContext.cs to include Document, DocumentShare, and AuditEvent and add indexes for user, project, and scan-state lookups
+- [X] T006 [P] Implement the local filesystem storage provider in ContosoDashboard/Services/LocalFileStorageService.cs using GUID-based paths under AppData/uploads and secure path generation
+- [X] T007 Create the primary upload/service layer in ContosoDashboard/Services/DocumentService.cs with validation, file-type checks, file-size enforcement, and permission-aware query methods
+- [X] T008 Add queue-based background scan contract and payload model in ContosoDashboard/Services/DocumentScanQueueMessage.cs and ContosoDashboard/Services/DocumentScanStatus.cs for Azure Queue Storage processing
+- [X] T009 Register the storage, queue, and document services in ContosoDashboard/Program.cs and wire the existing authorization policies to the new document workflow
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

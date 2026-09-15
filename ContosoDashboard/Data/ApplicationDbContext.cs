@@ -17,6 +17,87 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; } = null!;
     public DbSet<ProjectMember> ProjectMembers { get; set; } = null!;
     public DbSet<Announcement> Announcements { get; set; } = null!;
+    public DbSet<Document> Documents { get; set; } = null!;
+    public DbSet<DocumentShare> DocumentShares { get; set; } = null!;
+    public DbSet<AuditEvent> AuditEvents { get; set; } = null!;
+
+    public void EnsureDocumentSchema()
+    {
+        Database.ExecuteSqlRaw("""
+            IF OBJECT_ID(N'[Documents]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [Documents] (
+                    [DocumentId] int NOT NULL IDENTITY,
+                    [Title] nvarchar(255) NOT NULL,
+                    [Category] nvarchar(255) NOT NULL,
+                    [Description] nvarchar(500) NULL,
+                    [Tags] nvarchar(500) NULL,
+                    [UploadedByUserId] int NOT NULL,
+                    [ProjectId] int NULL,
+                    [FileName] nvarchar(500) NOT NULL,
+                    [FilePath] nvarchar(500) NOT NULL,
+                    [FileType] nvarchar(200) NOT NULL,
+                    [FileSizeBytes] bigint NOT NULL,
+                    [UploadedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NOT NULL,
+                    [ScanStatus] int NOT NULL,
+                    [IsDeleted] bit NOT NULL,
+                    [IsShared] bit NOT NULL,
+                    CONSTRAINT [PK_Documents] PRIMARY KEY ([DocumentId]),
+                    CONSTRAINT [FK_Documents_Users_UploadedByUserId]
+                        FOREIGN KEY ([UploadedByUserId]) REFERENCES [Users] ([UserId]),
+                    CONSTRAINT [FK_Documents_Projects_ProjectId]
+                        FOREIGN KEY ([ProjectId]) REFERENCES [Projects] ([ProjectId])
+                );
+
+                CREATE INDEX [IX_Documents_UploadedByUserId] ON [Documents] ([UploadedByUserId]);
+                CREATE INDEX [IX_Documents_ProjectId] ON [Documents] ([ProjectId]);
+                CREATE INDEX [IX_Documents_ScanStatus] ON [Documents] ([ScanStatus]);
+            END;
+
+            IF OBJECT_ID(N'[DocumentShares]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [DocumentShares] (
+                    [DocumentShareId] int NOT NULL IDENTITY,
+                    [DocumentId] int NOT NULL,
+                    [SharedWithUserId] int NOT NULL,
+                    [SharedByUserId] int NOT NULL,
+                    [SharedAt] datetime2 NOT NULL,
+                    [Permission] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_DocumentShares] PRIMARY KEY ([DocumentShareId]),
+                    CONSTRAINT [FK_DocumentShares_Documents_DocumentId]
+                        FOREIGN KEY ([DocumentId]) REFERENCES [Documents] ([DocumentId]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_DocumentShares_Users_SharedWithUserId]
+                        FOREIGN KEY ([SharedWithUserId]) REFERENCES [Users] ([UserId]),
+                    CONSTRAINT [FK_DocumentShares_Users_SharedByUserId]
+                        FOREIGN KEY ([SharedByUserId]) REFERENCES [Users] ([UserId])
+                );
+
+                CREATE INDEX [IX_DocumentShares_DocumentId_SharedWithUserId]
+                    ON [DocumentShares] ([DocumentId], [SharedWithUserId]);
+            END;
+
+            IF OBJECT_ID(N'[AuditEvents]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [AuditEvents] (
+                    [AuditEventId] int NOT NULL IDENTITY,
+                    [DocumentId] int NULL,
+                    [UserId] int NOT NULL,
+                    [Action] nvarchar(100) NOT NULL,
+                    [Details] nvarchar(1000) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_AuditEvents] PRIMARY KEY ([AuditEventId]),
+                    CONSTRAINT [FK_AuditEvents_Documents_DocumentId]
+                        FOREIGN KEY ([DocumentId]) REFERENCES [Documents] ([DocumentId]),
+                    CONSTRAINT [FK_AuditEvents_Users_UserId]
+                        FOREIGN KEY ([UserId]) REFERENCES [Users] ([UserId])
+                );
+
+                CREATE INDEX [IX_AuditEvents_DocumentId_UserId_Action]
+                    ON [AuditEvents] ([DocumentId], [UserId], [Action]);
+            END;
+            """);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -59,6 +140,21 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Notification>()
             .HasIndex(n => new { n.UserId, n.IsRead });
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.UploadedByUserId);
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.ProjectId);
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.ScanStatus);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(ds => new { ds.DocumentId, ds.SharedWithUserId });
+
+        modelBuilder.Entity<AuditEvent>()
+            .HasIndex(a => new { a.DocumentId, a.UserId, a.Action });
 
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
